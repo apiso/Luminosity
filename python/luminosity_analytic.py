@@ -18,6 +18,11 @@ from sympy import solveset
 #prms = params(Mc, rc, a, delad, Y, gamma = gammafn(delad), R = Rfn(Y), \
 #    Cv = Cvfn(Y, delad), Pd = Pdisk(a, mstar, FSigma, FT), \
 #    Td = Tdisk(a, FT), kappa = 0.1)    
+
+delad = 2./7
+a = 0.1
+Mc = 5 * Me
+rc = (3*Mc/(4*np.pi*rhoc))**(1./3)            
             
 prms = params(Mc, rc, a, delad, Y, gamma = gammafn(delad), R = Rfn(Y), \
     Cv = Cvfn(Y, delad), Pd = Pdisk(a, mstar, FSigma, FT), \
@@ -97,7 +102,7 @@ def tshrink(Rrcb, prms, td = 3e6 * yr):
     
     Matm = Matmevap(prms, td)
     
-    return 1 / (256 * np.pi**2) * 3 * prms.gamma**2 / (prms.gamma - 1)**2 * \
+    return 1 / (256 * np.pi**2) * 3 * prms.gamma**2 / (prms.gamma - 1) * \
         (kb / mu) * Matm / (sigma * prms.Td**3 * prms.rco**4) * \
             (RBp(prms) * Rrcb / prms.rco**2)**(-1 / (prms.gamma - 1)) * \
                 (prms.gamma / (2 * prms.gamma - 1) * Matm + \
@@ -139,10 +144,36 @@ def Lshrinknorm(t, prms, td = 3e6 * yr):
         
 ###############################################################################
 
+def rhorcblight(t, prms, td = 3e6 * yr):
+    
+    M = Matmevap(prms, td)
+    Rrcb = prms.rco
+    cs = np.sqrt(prms.R * prms.Td)
+    deltaM = 4 * np.pi * RB(prms) * prms.Pd / (prms.R * prms.Td) * cs * (t - td - deltatevap(prms, td))
+    
+    rho = rhorcb(M - deltaM, Rrcb, prms)
+    if rho >= 0:
+        return rho
+    else:
+        return 0
+        
+def Llight(t, prms):
+    
+    rho = rhorcblight(t, prms)
+    if rho != 0:
+        return 64 * np.pi / 3 * sigma * Trcb(prms)**4 * RBp(prms) / \
+            (prms.kappa * rho)
+    else:
+        return 0
+    
+
+###############################################################################
+
 def Lglobal(prms, tmin, tmax, npts, td = 3e6 * yr):
             
     t = np.logspace(np.log10(tmin), np.log10(tmax), npts)
     L = np.zeros(npts)
+    M = Matmevap(prms, td)
     
     for i in range(npts):
         if t[i] <= td:
@@ -150,7 +181,12 @@ def Lglobal(prms, tmin, tmax, npts, td = 3e6 * yr):
         elif td < t[i] <= td + deltatevap(prms, td):
             L[i] = Luminosity(td, prms)
         else:
-            L[i] = Lshrinknorm(t[i] - td, prms, td)
+            if M / prms.Mco >= mu / muc:
+                L[i] = Lshrink(t[i], prms, td) / \
+                    (Lshrink(td + deltatevap(prms, td), prms, td) / Luminosity(td, prms)) #- \
+                #(Lshrink(td + deltatevap(prms, td), prms, td) - Luminosity(td, prms)) #Lshrinknorm(t[i] - td, prms, td)
+            else:
+                L[i] = Llight(t[i], prms)
     return t, L
     
         
