@@ -133,7 +133,8 @@ def timeshrink(prms, td = 3e6 * yr):
                 
 def Lshrinknorm(t, prms, td = 3e6 * yr):
     
-        return Lshrink(t + timeshrink(prms, td), prms, td)        
+        return Lshrink(t + td + deltatevap(prms, td), prms, td) - \
+            (Lshrink(td + deltatevap(prms, td), prms, td) - Luminosity(td, prms))        
         
         
 ###############################################################################
