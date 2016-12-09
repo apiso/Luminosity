@@ -21,7 +21,7 @@ from sympy import solveset
 
 delad = 2./7
 a = 0.1
-Mc = 5 * Me
+Mc = 10 * Me
 rc = (3*Mc/(4*np.pi*rhoc))**(1./3)            
             
 prms = params(Mc, rc, a, delad, Y, gamma = gammafn(delad), R = Rfn(Y), \
