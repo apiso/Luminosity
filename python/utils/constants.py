@@ -38,19 +38,23 @@ def RHill(mp, a, Ms = Msun):
     in cgs
     """
     return (mp / 3 / Ms)**(1./3) * a * AU
+    
 
 #MMSN disk model
 #(could/ should make the deviations from standard MMSN optional or keyword parameters)
 def Tdisk(a, FT):  
     """Disk temperature as function of semi-major axis (a in AU) and Ft"""
-    return 120 * FT * (a)**(-3./7)
+    if a >= 0.5:
+        return 120 * FT * (a)**(-3./7)
+    else:
+        return 1e3
 
 def Pdisk(a, mstar, FSigma, FT): 
     """
     Disk pressure (in dyn cm^-2) as function of semi-major axis (a in AU),
     stellar mass (mstar in solar masses), and factors Fsigma and Ft
     """
-    return 1.1 * 10**(-4) * FSigma * np.sqrt(FT * mstar) * a**(-45./14) * 10**6
+    return 11.3 * FSigma * np.sqrt(FT * mstar) * a**(-45./14)
 
 def Hdisk(a, FT):  #a in AU
     """Disk scaleheight (in cm) as function of semi-major axis and Ft"""
@@ -128,6 +132,11 @@ def Cvfn(Y, delad):
     Assumes that the He fraction only affects mu, but not delad.
     """
     return Rfn(Y) / (gammafn(delad) - 1)
+    
+    
+def RB(m, a, FT = 1, Y = 0.3):
+    
+    return G * m / (Rfn(Y) * Tdisk(a, FT))
 
 #tuple of gas, disk and core parameters for polytrope
 params = namedtuple( \
