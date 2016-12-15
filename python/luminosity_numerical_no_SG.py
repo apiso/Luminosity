@@ -46,7 +46,7 @@ rc = (3*Mc/(4*np.pi*rhoc))**(1./3)
             
 prms = params(Mc, rc, a, delad, Y, gamma = gammafn(delad), R = Rfn(Y), \
     Cv = Cvfn(Y, delad), Pd = Pdisk(a, mstar, FSigma, FT), \
-    Td = 1e3, kappa = kconst)
+    Td = 1e3, kappa = kdustall)
     
 A = 5 * np.pi / 16
 mu = 2.35 * mp
@@ -278,24 +278,49 @@ def shoot(Tc, L1, L2, n, tol, prms = prms):
     fU = interp1d(delrad[::-1], U[::-1])
     fIu = interp1d(delrad[::-1], Iu[::-1])
 
-    try:
-        rcb = float(fr(prms.delad))
-        Pcb = float(fP(prms.delad))
-        Tcb = float(fT(prms.delad))
-        Mcb = float(fm(prms.delad))
-        Egcb = float(fEg(prms.delad))
-        Ucb = float(fU(prms.delad))
-        Iucb = float(fIu(prms.delad))
-        Etotcb = Egcb + Ucb
-    except ValueError:
-        rcb = r[-1]
-        Pcb = P[-1]
-        Tcb = T[-1]
-        Mcb = m[-1]
-        Egcb = Eg[-1]
-        Ucb = U[-1]
-        Iucb = Iu[-1]
-        Etotcb = Egcb + Ucb
+    
+    if prms.kappa == kconst:
+        try:
+            rcb = float(fr(prms.delad))
+            Pcb = float(fP(prms.delad))
+            Tcb = float(fT(prms.delad))
+            Mcb = float(fm(prms.delad))
+            Egcb = float(fEg(prms.delad))
+            Ucb = float(fU(prms.delad))
+            Iucb = float(fIu(prms.delad))
+            Etotcb = Egcb + Ucb
+        except ValueError:
+            rcb = r[-1]
+            Pcb = P[-1]
+            Tcb = T[-1]
+            Mcb = m[-1]
+            Egcb = Eg[-1]
+            Ucb = U[-1]
+            Iucb = Iu[-1]
+            Etotcb = Egcb + Ucb
+        
+    elif prms.kappa == kdustall:
+        for i in range(len(delrad) - 1):
+            if (delrad[i] - prms.delad) * (delrad[i + 1] - prms.delad) < 0:
+                break
+            rcb = (r[i] + r[i + 1]) / 2
+            Pcb = (P[i] + P[i + 1]) / 2
+            Tcb = (T[i] + T[i + 1]) / 2
+            Mcb = (m[i] + m[i + 1]) / 2
+            Egcb = (Eg[i] + Eg[i + 1]) / 2
+            Ucb = (U[i] + U[i + 1]) / 2
+            Iucb = (Iu[i] + Iu[i + 1]) / 2
+            Etotcb = Egcb + Ucb
+        if i == len(delrad) - 2:
+            rcb = r[-1]
+            Pcb = P[-1]
+            Tcb = T[-1]
+            Mcb = m[-1]
+            Egcb = Eg[-1]
+            Ucb = U[-1]
+            Iucb = Iu[-1]
+            Etotcb = Egcb + Ucb
+            
         
     Egout = Eg[-1]
     Uout = U[-1]

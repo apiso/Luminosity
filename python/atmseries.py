@@ -10,7 +10,7 @@ profiles.
 
 from utils.constants import G, kb, mp, Rb, Me, Re, Msun, RH, RHe, sigma, \
      cmperau, RHill, gammafn, mufn, Rfn, Cvfn, kdust, Tdisk, Pdisk, params, \
-     kdust, kdustbeta1, kdust10, kdust100, kconst
+     kdust, kdustbeta1, kdust10, kdust100, kconst, kdustall
 from utils.parameters import FT, FSigma, mstar, Y, delad, rhoc, Mc, rc, \
     gamma, Y, a
 import numpy as np
@@ -26,19 +26,19 @@ from scipy.optimize import fminbound, brentq
 from luminosity_numerical_no_SG import Ltop, shoot, prms, Tcmin
 
 
-delad = 2./7
-a = 0.1
-Mc = 10 * Me
-rc = (3*Mc/(4*np.pi*rhoc))**(1./3)            
+#delad = 2./7
+#a = 5
+#Mc = 10 * Me
+#rc = (3*Mc/(4*np.pi*rhoc))**(1./3)            
             
-prms = params(Mc, rc, a, delad, Y, gamma = gammafn(delad), R = Rfn(Y), \
-    Cv = Cvfn(Y, delad), Pd = Pdisk(a, mstar, FSigma, FT), \
-    Td = 1e3, kappa = kconst)
+#prms = params(Mc, rc, a, delad, Y, gamma = gammafn(delad), R = Rfn(Y), \
+#    Cv = Cvfn(Y, delad), Pd = Pdisk(a, mstar, FSigma, FT), \
+#    Td = 1e3, kappa = kdustall)
     
-A = 5 * np.pi / 16
-mu = 2.35 * mp
-gammac = 4./3
-muc = 60 * mp
+#A = 5 * np.pi / 16
+#mu = 2.35 * mp
+#gammac = 4./3
+#muc = 60 * mp
 
 
 def profiles_write(n, nTcpoints, L1, L2, Tcmax, filename, Tcm = Tcmin(prms), prms = prms, \
@@ -88,8 +88,12 @@ def profiles_write(n, nTcpoints, L1, L2, Tcmax, filename, Tcm = Tcmin(prms), prm
         print i
 
 
-    if savefile == 1:
+    if prms.kappa == kconst:
         paramfilename = '../dat/NO_SG/k_constant/' + filename + '.npz'
+        np.savez_compressed(paramfilename, model = model, param = param, prof = prof)
+        
+    elif prms.kappa == kdustall:
+        paramfilename = '../dat/NO_SG/k_dust/' + filename + '.npz'
         np.savez_compressed(paramfilename, model = model, param = param, prof = prof)
             
     
@@ -116,8 +120,10 @@ def atmload(filename, prms = prms, disk = 1):
 #                                str(prms.a) + 'AU/' + filename)  
 
 
-    npzdat = np.load('../dat/NO_SG/k_constant/' + filename + '.npz')
-        
+    if prms.kappa == kconst:
+        npzdat = np.load('../dat/NO_SG/k_constant/' + filename + '.npz')
+    elif prms.kappa == kdustall:
+        npzdat = np.load('../dat/NO_SG/k_dust/' + filename + '.npz')
     model = npzdat['model'].view(np.recarray)
     param = npzdat['param'].view(np.recarray)
     prof = npzdat['prof'].view(np.recarray)
