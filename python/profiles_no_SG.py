@@ -92,7 +92,7 @@ def profiles_write(n, nTcpoints, L1, L2, Tcmax, filename, Tcm = Tcmin(prms), prm
         paramfilename = '../dat/NO_SG/k_constant/' + filename + '.npz'
         np.savez_compressed(paramfilename, model = model, param = param, prof = prof)
         
-    elif prms.kappa == kdustall:
+    elif prms.kappa == kdust:
         paramfilename = '../dat/NO_SG/k_dust/' + filename + '.npz'
         np.savez_compressed(paramfilename, model = model, param = param, prof = prof)
             
@@ -122,7 +122,7 @@ def atmload(filename, prms = prms, disk = 1):
 
     if prms.kappa == kconst:
         npzdat = np.load('../dat/NO_SG/k_constant/' + filename + '.npz')
-    elif prms.kappa == kdustall:
+    elif prms.kappa == kdust:
         npzdat = np.load('../dat/NO_SG/k_dust/' + filename + '.npz')
     model = npzdat['model'].view(np.recarray)
     param = npzdat['param'].view(np.recarray)
