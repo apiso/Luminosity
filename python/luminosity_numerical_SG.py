@@ -38,7 +38,7 @@ from scipy.optimize import brentq
 
 prms = params(Mc, rc, a, delad, Y, gamma = gammafn(delad), R = Rfn(Y), \
               Cv = Cvfn(Y, delad), Pd = Pdisk(a, mstar, FSigma, FT), \
-              Td = 1e3, kappa = kdust) #gas, disk and core parameters
+              Td = Tdisk(a, FT), kappa = kdust) #gas, disk and core parameters
                         #for specific values imported from parameters.py 
 
 def delradfn(p, m, T, L, prms = prms): #radiative temperature gradient
