@@ -11,10 +11,12 @@ import matplotlib.cm as cm
 from collections import namedtuple
 from scipy import integrate, interpolate, optimize
 from scipy.integrate import odeint
+from types import FunctionType as function
 from scipy.interpolate import interp1d
 from scipy.optimize import brentq
 from profiles_SG import atmload
 from cooling import cooling_global
+from luminosity_numerical_SG import shoot
 
 
 prms = params(Mc, rc, a, delad, Y, gamma = gammafn(delad), R = Rfn(Y), \
@@ -29,7 +31,7 @@ def delradfn(p, m, T, L, prms = prms): #radiative temperature gradient
 def Del(p, m, T, L, prms = prms): #del = min(delad, delrad)
     return min(prms.delad, delradfn(p, m, T, L, prms))
 
-def mass_loss(filename, prms = prms, td = 3e6):
+def mass_loss(filename, prms = prms, td = 3e6, tol = 1e-24, n = 100, nMpoints = 500):
     
     """
     
@@ -73,6 +75,33 @@ def mass_loss(filename, prms = prms, td = 3e6):
     EtotBd = float(fEtotB(MBd))
     
     
+    model2 = np.array([(prms.Mco, prms.rco, prms.a, prms.delad, prms.Y, \
+                          prms.gamma, prms.R, prms.Cv, prms.Pd, prms.Td, \
+                          prms.kappa)], \
+                        dtype = [('Mco', float), ('rco', float), ('a', float), \
+                                 ('delad', float), ('Y', float), \
+                                 ('gamma', float), \
+                                 ('R', float), ('Cv', float), ('Pd', float), \
+                                 ('Td', float), ('kappa', function)])
+    
+    prof2 = np.recarray(shape = (nMpoints, n), \
+                          dtype = [('r', float), ('P', float), ('t', float), \
+                                   ('m', float), ('rho', float), ('delrad', float), \
+                                   ('Eg', float), ('U', float)])
+    param2 = np.recarray(\
+        shape = (nMpoints), \
+        dtype = [('Mtot', float), ('Mcb', float), ('MB', float), ('rcb', float),\
+                 ('RB', float), ('RHill', float), ('Pc', float), ('Pcb', float),\
+                 ('PB', float), ('Tc', float), ('Tcb', float), ('TB', float), \
+                 ('Egcb', float), ('Ucb', float), ('Etotcb', float), \
+                 ('EgB', float), ('UB', float), ('EtotB', float), \
+                 ('EgHill', float), ('UHill', float), ('EtotHill', float), \
+                 ('L', float), ('vircb', float), ('virHill', float), \
+                 ('err', float)])
+    
+    
+    
+    
     
     def f(x, r):
     #    
@@ -81,11 +110,10 @@ def mass_loss(filename, prms = prms, td = 3e6):
     #    with Iu the 3p/rho dm integral in the virial theorem
     #dp/dr = - G * m * P / (r**2 * R * T),
     #dT/dr = - del * G * m / (R * r**2)
-    #dm/dr = 4 * pi * r**2 * p / (R * T)
+    ###dm/dr = 4 * pi * r**2 * p / (R * T)
     #dL/dr = 0
-    #dEg/dr = - 4 * pi * G * m * r * P / (R * T)
+    ###dEg/dr = - 4 * pi * G * m * r * P / (R * T)
     #dU/dr = 4 * pi * r**2 * P * Cv / R
-    #dIu/dr = 12 * pi * P * r**2
     #"""
         
         return np.array([ - G * x[2] * x[0] / (r**2 * prms.R * x[1]), \
@@ -96,11 +124,76 @@ def mass_loss(filename, prms = prms, td = 3e6):
                              - 4 * pi * G * x[2] * r * x[0] / (prms.R * x[1]), \
                              4 * pi * r**2 * x[0] * prms.Cv / prms.R]) 
     #E0 = G * Mi**2 / rfit
-    r = np.logspace(np.log10(RBd*Re), np.log10(0.9*RBd*Re), 2)
+    R = np.logspace(np.log10(RBd*Re), np.log10(0.9*RBd*Re), nMpoints)
         #radius grid
-    y = odeint(f, [prms.Pd, prms.Td, MBd * Me, Ld, 0, 0], r)
+    r = R#[:2]    
     
-    return MBd, Ld, EtotBd, RBd, y
+    y = odeint(f, [0, prms.Td, MBd*Me, Ld, 0, 0], r)
+    
+    Mi = y[1][2]
+    Egabs = y[1][4]
+    
+    sol = shoot(Mi, Ld*1e-3, Ld*1e3, n, tol, prms)
+    
+    i = 0
+    
+    param2.Mtot[i], param2.Mcb[i], param2.MB[i], param2.rcb[i], param2.RB[i], \
+                       param2.RHill[i], param2.Pc[i], param2.Pcb[i], param2.PB[i],\
+                       param2.Tc[i], param2.Tcb[i], param2.TB[i], param2.Egcb[i], \
+                       param2.Ucb[i], param2.Etotcb[i], param2.EgB[i], \
+                       param2.UB[i], param2.EtotB[i], param2.EgHill[i], \
+                       param2.UHill[i], param2.EtotHill[i], param2.L[i], \
+                       param2.vircb[i], param2.virHill[i], param2.err[i] = sol[8:]
+
+    for k in range(n):
+        prof2.r[i, k], prof2.P[i, k], prof2.t[i, k], prof2.m[i, k], \
+                      prof2.rho[i, k], prof2.delrad[i, k], \
+                      prof2.Eg[i, k], prof2.U[i, k] = \
+                      sol[0][k], sol[1][k], sol[2][k], sol[3][k], sol[4][k], \
+                      sol[5][k], sol[6][k], sol[7][k]  
+                      
+    Mi = param2.MB[i] * Me
+    Li = param2.L[i]
+    Etoti = np.abs(param2.EtotB[i])
+    i = 1
+    
+    while(np.abs(Etoti) - Egabs) >= 0:
+    
+        r = R[i:i+2]    
+    
+        y = odeint(f, [prms.Pd, prms.Td, Mi, Li, 0, 0], r)
+    
+        Mi = y[1][2]
+        Li = param2.L[i - 1]
+        Egabs = Egabs + y[1][4]
+        Etoti = np.abs(param2.EtotB[i-1])
+    
+        sol = shoot(Mi, Li*1e-2, Li*1e2, n, tol, prms)
+    
+    
+        param2.Mtot[i], param2.Mcb[i], param2.MB[i], param2.rcb[i], param2.RB[i], \
+                       param2.RHill[i], param2.Pc[i], param2.Pcb[i], param2.PB[   i],\
+                       param2.Tc[i], param2.Tcb[i], param2.TB[i], param2.Egcb[i], \
+                       param2.Ucb[i], param2.Etotcb[i], param2.EgB[i], \
+                       param2.UB[i], param2.EtotB[i], param2.EgHill[i], \
+                       param2.UHill[i], param2.EtotHill[i], param2.L[i], \
+                       param2.vircb[i], param2.virHill[i], param2.err[i] = sol[8:]
+
+        for k in range(n):
+            prof2.r[i, k], prof2.P[i, k], prof2.t[i, k], prof2.m[i, k], \
+                      prof2.rho[i, k], prof2.delrad[i, k], \
+                      prof2.Eg[i, k], prof2.U[i, k] = \
+                      sol[0][k], sol[1][k], sol[2][k], sol[3][k], sol[4][k], \
+                      sol[5][k], sol[6][k], sol[7][k]  
+                      
+        i += 1
+        
+        print i
+    
+    
+    
+    
+    #return MBd, Ld, EtotBd, RBd, y
     
     
     
