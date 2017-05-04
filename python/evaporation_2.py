@@ -15,8 +15,10 @@ from types import FunctionType as function
 from scipy.interpolate import interp1d
 from scipy.optimize import brentq
 from profiles_SG import atmload
+from profiles_no_SG import atmload as atmloadnoSG
 from cooling import cooling_global
 from luminosity_numerical_SG import shoot
+from luminosity_numerical_no_SG import shoot as shootnoSG
 
 
 #prms = params(Mc, rc, a, delad, Y, gamma = gammafn(delad), R = Rfn(Y), \
@@ -133,7 +135,7 @@ def mass_loss(filename, prms, td = 3e6):
     
     
     
-def mass_loss_2(filename, prms, td = 3e6, n = 500, tol = 1e-24):
+def mass_loss_2(filename, prms, td = 3e6, n = 500, tol = 1e-24, SG = 1):
     
     """
     
@@ -143,17 +145,25 @@ def mass_loss_2(filename, prms, td = 3e6, n = 500, tol = 1e-24):
     atmospheric luminosity, radius, pressure etc.
     
     """
-    
-    model, param, prof = atmload(filename, prms)
+    if SG == 1:
+        model, param, prof = atmload(filename, prms)
+    else:
+        model, param, prof = atmloadnoSG(filename, prms)
+        param.MB = param.Mtot
     dt = cooling_global(param, prof, model, out='rcb')[1]
     
     time = []
     
     for i in range(len(dt)):
         time = np.append(time, sum(dt[:i + 1]))
-        
-    f = interp1d(time / yr, param.MB[:-1])
-    MBd = float(f(td))
+    if SG == 1:    
+        f = interp1d(time / yr, param.MB[:-1])
+        MBd = float(f(td))
+    else:
+        f = interp1d(time / yr, param.Tc[:-1])
+        Tcd = float(f(td))
+        fMB = interp1d(param.Tc, param.MB)
+        MBd = float(fMB(Tcd))    
     
 #    fMrcb = interp1d(param.MB, param.Mcb)
 #    Mrcbd = float(fMrcb(MBd))
@@ -163,16 +173,25 @@ def mass_loss_2(filename, prms, td = 3e6, n = 500, tol = 1e-24):
 #
 #    fRB = interp1d(param.MB, param.RB)
 #    RBd = float(fRB(MBd))
-#    
-    fL = interp1d(param.MB, param.L)
-    Ld = float(fL(MBd))    
+#   
+    if SG == 1: 
+        fL = interp1d(param.MB, param.L)
+        Ld = float(fL(MBd)) 
+    else:
+        fL = interp1d(param.Tc, param.L)
+        Ld = float(fL(Tcd))    
+    if SG == 1:
+        sol = shoot(MBd * Me, Ld*1e-1, Ld*1e1, n, tol, prms)
+        r, P, T, m, rho, delrad, Eg, U, Mi, Mcb, MB, rcb, \
+            RB, rfit, Pc, Pcb, PB, Tc, Tcb, TB, Egcb, Ucb, Etotcb, \
+            EgB, UB, EtotB, EgHill, UHill, EtotHill, L, vircb, virHill, err = sol
+        Etot = Eg + U
     
-    sol = shoot(MBd * Me, Ld*1e-1, Ld*1e1, n, tol, prms)
-    
-    r, P, T, m, rho, delrad, Eg, U, Mi, Mcb, MB, rcb, \
-           RB, rfit, Pc, Pcb, PB, Tc, Tcb, TB, Egcb, Ucb, Etotcb, \
-           EgB, UB, EtotB, EgHill, UHill, EtotHill, L, vircb, virHill, err = sol
-    Etot = Eg + U
+    else:
+        sol = shootnoSG(Tcd, Ld*1e-1, Ld*1e1, n, tol, prms)
+        r, P, T, rho, m, delrad, Eg, U, Mcb, MB, rcb, RB, Pc, Pcb, Tc, Tcb, \
+            Egcb, Ucb, Etotcb, EgB, UB, EtotB, L, err = sol
+        Etot = Eg + U
     
     for i in range(n)[::-1]:
         Eevap = np.abs(EtotB - Etot[i])
