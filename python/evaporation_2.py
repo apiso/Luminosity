@@ -133,101 +133,158 @@ def mass_loss(filename, prms, td = 3e6):
     
     
     
+def mass_loss_2(filename, prms, td = 3e6, n = 500, tol = 1e-24):
     
+    """
     
-    def f(x, r):
-    #    
-    #"""
-    #structure eqns. "x" = [p , T , m, L, Eg, U, Iu],
-    #    with Iu the 3p/rho dm integral in the virial theorem
-    #dp/dr = - G * m * P / (r**2 * R * T),
-    #dT/dr = - del * G * m / (R * r**2)
-    ###dm/dr = 4 * pi * r**2 * p / (R * T)
-    #dL/dr = 0
-    ###dEg/dr = - 4 * pi * G * m * r * P / (R * T)
-    #dU/dr = 4 * pi * r**2 * P * Cv / R
-    #"""
+    Determines the mass loss due to spontaneous mass loss after disk dispersal 
+    as the disk density goes to zero. Calculates the timescale on which this 
+    process happens, the atmospheric mass that is evaporated, the change in
+    atmospheric luminosity, radius, pressure etc.
+    
+    """
+    
+    model, param, prof = atmload(filename, prms)
+    dt = cooling_global(param, prof, model, out='rcb')[1]
+    
+    time = []
+    
+    for i in range(len(dt)):
+        time = np.append(time, sum(dt[:i + 1]))
         
-        return np.array([ - G * x[2] * x[0] / (r**2 * prms.R * x[1]), \
-                             - Del(x[0], x[2], x[1], x[3], prms) * G * x[2] / \
-                             (prms.R * r**2),
-                             4 * pi * r**2 * x[0] / (prms.R * x[1]), \
-                             0, \
-                             - 4 * pi * G * x[2] * r * x[0] / (prms.R * x[1]), \
-                             4 * pi * r**2 * x[0] * prms.Cv / prms.R]) 
-    #E0 = G * Mi**2 / rfit
-    R = np.logspace(np.log10(RBd*Re), np.log10(model.rco), nMpoints)
-        #radius grid
-    r = R[:2]    
+    f = interp1d(time / yr, param.MB[:-1])
+    MBd = float(f(td))
     
-    y = odeint(f, [prms.Pd, prms.Td, MBd*Me, Ld, EgBd, UBd], r)
+#    fMrcb = interp1d(param.MB, param.Mcb)
+#    Mrcbd = float(fMrcb(MBd))
+#    
+#    frcb = interp1d(param.MB, param.rcb)
+#    rcbd = float(frcb(MBd))
+#
+#    fRB = interp1d(param.MB, param.RB)
+#    RBd = float(fRB(MBd))
+#    
+    fL = interp1d(param.MB, param.L)
+    Ld = float(fL(MBd))    
     
-    Mi = y[1][2]
-    Egabs = -(y[0][4] - y[1][4])
-    Etoti = y[1][4]
-
+    sol = shoot(MBd * Me, Ld*1e-1, Ld*1e1, n, tol, prms)
     
-    sol = shoot(Mi, Ld*1e-3, Ld*1e3, n, tol, prms)
+    r, P, T, m, rho, delrad, Eg, U, Mi, Mcb, MB, rcb, \
+           RB, rfit, Pc, Pcb, PB, Tc, Tcb, TB, Egcb, Ucb, Etotcb, \
+           EgB, UB, EtotB, EgHill, UHill, EtotHill, L, vircb, virHill, err = sol
+    Etot = Eg + U
     
-    i = 0
+    for i in range(n)[::-1]:
+        Eevap = np.abs(EtotB - Etot[i])
+        Ecool = np.abs(Etot[i])
+                
+        if Ecool - Eevap < 0:
+            break
+    indf = i
     
-    param2.Mtot[i], param2.Mcb[i], param2.MB[i], param2.rcb[i], param2.RB[i], \
-                       param2.RHill[i], param2.Pc[i], param2.Pcb[i], param2.PB[i],\
-                       param2.Tc[i], param2.Tcb[i], param2.TB[i], param2.Egcb[i], \
-                       param2.Ucb[i], param2.Etotcb[i], param2.EgB[i], \
-                       param2.UB[i], param2.EtotB[i], param2.EgHill[i], \
-                       param2.UHill[i], param2.EtotHill[i], param2.L[i], \
-                       param2.vircb[i], param2.virHill[i], param2.err[i] = sol[8:]
-
-    for k in range(n):
-        prof2.r[i, k], prof2.P[i, k], prof2.t[i, k], prof2.m[i, k], \
-                      prof2.rho[i, k], prof2.delrad[i, k], \
-                      prof2.Eg[i, k], prof2.U[i, k] = \
-                      sol[0][k], sol[1][k], sol[2][k], sol[3][k], sol[4][k], \
-                      sol[5][k], sol[6][k], sol[7][k]  
-                      
-    Mi = param2.MB[i] * Me
-    Li = param2.L[i]
-    Etoti = np.abs(param2.EtotB[i])
-    i = 1
+    Mf = m[indf] / Me
+    rf = r[indf] / model.rco[0]
+    t = -(EtotB - Etot[indf])/L
     
-    while(np.abs(Etoti) - Egabs) >= 0:
-    
-        r = R[i:i+2]    
-    
-        y = odeint(f, [prms.Pd, prms.Td, Mi, Li, param2.EgB[i-1], param2.UB[i-1]], r)
-    
-        Mi = y[1][2]
-        Li = param2.L[i - 1]
-        Egabs = Egabs -(y[0][4] - y[1][4])
-        Etoti = np.abs(param2.EtotB[i-1])
-    
-        sol = shoot(Mi, Li*1e-2, Li*1e2, n, tol, prms)
-    
-    
-        param2.Mtot[i], param2.Mcb[i], param2.MB[i], param2.rcb[i], param2.RB[i], \
-                       param2.RHill[i], param2.Pc[i], param2.Pcb[i], param2.PB[   i],\
-                       param2.Tc[i], param2.Tcb[i], param2.TB[i], param2.Egcb[i], \
-                       param2.Ucb[i], param2.Etotcb[i], param2.EgB[i], \
-                       param2.UB[i], param2.EtotB[i], param2.EgHill[i], \
-                       param2.UHill[i], param2.EtotHill[i], param2.L[i], \
-                       param2.vircb[i], param2.virHill[i], param2.err[i] = sol[8:]
-
-        for k in range(n):
-            prof2.r[i, k], prof2.P[i, k], prof2.t[i, k], prof2.m[i, k], \
-                      prof2.rho[i, k], prof2.delrad[i, k], \
-                      prof2.Eg[i, k], prof2.U[i, k] = \
-                      sol[0][k], sol[1][k], sol[2][k], sol[3][k], sol[4][k], \
-                      sol[5][k], sol[6][k], sol[7][k]  
-                      
-        i += 1
-        
-        print i
+    return L, t, Mf, rf, MBd
     
     
     
-    
-    #return MBd, Ld, EtotBd, RBd, y
+#    
+#    
+#    def f(x, r):
+#    #    
+#    #"""
+#    #structure eqns. "x" = [p , T , m, L, Eg, U, Iu],
+#    #    with Iu the 3p/rho dm integral in the virial theorem
+#    #dp/dr = - G * m * P / (r**2 * R * T),
+#    #dT/dr = - del * G * m / (R * r**2)
+#    ###dm/dr = 4 * pi * r**2 * p / (R * T)
+#    #dL/dr = 0
+#    ###dEg/dr = - 4 * pi * G * m * r * P / (R * T)
+#    #dU/dr = 4 * pi * r**2 * P * Cv / R
+#    #"""
+#        
+#        return np.array([ - G * x[2] * x[0] / (r**2 * prms.R * x[1]), \
+#                             - Del(x[0], x[2], x[1], x[3], prms) * G * x[2] / \
+#                             (prms.R * r**2),
+#                             4 * pi * r**2 * x[0] / (prms.R * x[1]), \
+#                             0, \
+#                             - 4 * pi * G * x[2] * r * x[0] / (prms.R * x[1]), \
+#                             4 * pi * r**2 * x[0] * prms.Cv / prms.R]) 
+#    #E0 = G * Mi**2 / rfit
+#    R = np.logspace(np.log10(RBd*Re), np.log10(model.rco), nMpoints)
+#        #radius grid
+#    r = R[:2]    
+#    
+#    y = odeint(f, [prms.Pd, prms.Td, MBd*Me, Ld, EgBd, UBd], r)
+#    
+#    Mi = y[1][2]
+#    Egabs = -(y[0][4] - y[1][4])
+#    Etoti = y[1][4]
+#
+#    
+#    sol = shoot(Mi, Ld*1e-3, Ld*1e3, n, tol, prms)
+#    
+#    i = 0
+#    
+#    param2.Mtot[i], param2.Mcb[i], param2.MB[i], param2.rcb[i], param2.RB[i], \
+#                       param2.RHill[i], param2.Pc[i], param2.Pcb[i], param2.PB[i],\
+#                       param2.Tc[i], param2.Tcb[i], param2.TB[i], param2.Egcb[i], \
+#                       param2.Ucb[i], param2.Etotcb[i], param2.EgB[i], \
+#                       param2.UB[i], param2.EtotB[i], param2.EgHill[i], \
+#                       param2.UHill[i], param2.EtotHill[i], param2.L[i], \
+#                       param2.vircb[i], param2.virHill[i], param2.err[i] = sol[8:]
+#
+#    for k in range(n):
+#        prof2.r[i, k], prof2.P[i, k], prof2.t[i, k], prof2.m[i, k], \
+#                      prof2.rho[i, k], prof2.delrad[i, k], \
+#                      prof2.Eg[i, k], prof2.U[i, k] = \
+#                      sol[0][k], sol[1][k], sol[2][k], sol[3][k], sol[4][k], \
+#                      sol[5][k], sol[6][k], sol[7][k]  
+#                      
+#    Mi = param2.MB[i] * Me
+#    Li = param2.L[i]
+#    Etoti = np.abs(param2.EtotB[i])
+#    i = 1
+#    
+#    while(np.abs(Etoti) - Egabs) >= 0:
+#    
+#        r = R[i:i+2]    
+#    
+#        y = odeint(f, [prms.Pd, prms.Td, Mi, Li, param2.EgB[i-1], param2.UB[i-1]], r)
+#    
+#        Mi = y[1][2]
+#        Li = param2.L[i - 1]
+#        Egabs = Egabs -(y[0][4] - y[1][4])
+#        Etoti = np.abs(param2.EtotB[i-1])
+#    
+#        sol = shoot(Mi, Li*1e-2, Li*1e2, n, tol, prms)
+#    
+#    
+#        param2.Mtot[i], param2.Mcb[i], param2.MB[i], param2.rcb[i], param2.RB[i], \
+#                       param2.RHill[i], param2.Pc[i], param2.Pcb[i], param2.PB[   i],\
+#                       param2.Tc[i], param2.Tcb[i], param2.TB[i], param2.Egcb[i], \
+#                       param2.Ucb[i], param2.Etotcb[i], param2.EgB[i], \
+#                       param2.UB[i], param2.EtotB[i], param2.EgHill[i], \
+#                       param2.UHill[i], param2.EtotHill[i], param2.L[i], \
+#                       param2.vircb[i], param2.virHill[i], param2.err[i] = sol[8:]
+#
+#        for k in range(n):
+#            prof2.r[i, k], prof2.P[i, k], prof2.t[i, k], prof2.m[i, k], \
+#                      prof2.rho[i, k], prof2.delrad[i, k], \
+#                      prof2.Eg[i, k], prof2.U[i, k] = \
+#                      sol[0][k], sol[1][k], sol[2][k], sol[3][k], sol[4][k], \
+#                      sol[5][k], sol[6][k], sol[7][k]  
+#                      
+#        i += 1
+#        
+#        print i
+#    
+#    
+#    
+#    
+#    #return MBd, Ld, EtotBd, RBd, y
     
     
     
