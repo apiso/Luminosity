@@ -14,24 +14,24 @@ from scipy.integrate import odeint
 from types import FunctionType as function
 from scipy.interpolate import interp1d
 from scipy.optimize import brentq
-from profiles_SG import atmload
+from profiles_no_SG import atmload
 from cooling import cooling_global
-from luminosity_numerical_SG import shoot
+from luminosity_numerical_no_SG import shoot
 
 
-#prms = params(Mc, rc, a, delad, Y, gamma = gammafn(delad), R = Rfn(Y), \
-#              Cv = Cvfn(Y, delad), Pd = Pdisk(a, mstar, FSigma, FT), \
-#              Td = Tdisk(a, FT), kappa = kdust) #gas, disk and core parameters
+prms = params(Mc, rc, a, delad, Y, gamma = gammafn(delad), R = Rfn(Y), \
+              Cv = Cvfn(Y, delad), Pd = Pdisk(a, mstar, FSigma, FT), \
+              Td = 1e3, kappa = kdust) #gas, disk and core parameters
                         #for specific values imported from parameters.py 
 
-def delradfn(p, m, T, L, prms): #radiative temperature gradient
+def delradfn(p, m, T, L, prms = prms): #radiative temperature gradient
     rho = p / (prms.R * T)
     return 3 * prms.kappa(T, rho) * p * L / (64 * pi * G * m * sigma * T**4)
 
-def Del(p, m, T, L, prms): #del = min(delad, delrad)
+def Del(p, m, T, L, prms = prms): #del = min(delad, delrad)
     return min(prms.delad, delradfn(p, m, T, L, prms))
 
-def mass_loss(filename, prms = prms, td = 3e6, tol = 1e-24, n = 100, nMpoints = 500):
+def mass_loss(filename, prms = prms, td = 3e6, tol = 1e-24, n = 100, nTcpoints = 500):
     
     """
     
@@ -49,7 +49,13 @@ def mass_loss(filename, prms = prms, td = 3e6, tol = 1e-24, n = 100, nMpoints = 
     
     for i in range(len(dt)):
         time = np.append(time, sum(dt[:i + 1]))
-        
+    
+    param.MB = param.Mtot
+    param.RB = param.rout
+    param.EtotB = param.Etotout  
+    param.EgB = param.Egout
+    param.UB = param.Uout  
+                
     f = interp1d(time / yr, param.MB[:-1])
     MBd = float(f(td))
     
@@ -84,21 +90,18 @@ def mass_loss(filename, prms = prms, td = 3e6, tol = 1e-24, n = 100, nMpoints = 
                                  ('R', float), ('Cv', float), ('Pd', float), \
                                  ('Td', float), ('kappa', function)])
     
-    prof2 = np.recarray(shape = (nMpoints, n), \
+    prof2 = np.recarray(shape = (nTcpoints, n), \
                           dtype = [('r', float), ('P', float), ('t', float), \
-                                   ('m', float), ('rho', float), ('delrad', float), \
+                                   ('rho', float), ('m', float), ('delrad', float), \
                                    ('Eg', float), ('U', float)])
-    param2 = np.recarray(\
-        shape = (nMpoints), \
-        dtype = [('Mtot', float), ('Mcb', float), ('MB', float), ('rcb', float),\
-                 ('RB', float), ('RHill', float), ('Pc', float), ('Pcb', float),\
-                 ('PB', float), ('Tc', float), ('Tcb', float), ('TB', float), \
+    param2= np.recarray(\
+        shape = (nTcpoints), \
+        dtype = [('Mcb', float), ('Mtot', float), ('rcb', float),\
+                 ('rout', float), ('Pc', float), ('Pcb', float),\
+                 ('Tc', float), ('Tcb', float), \
                  ('Egcb', float), ('Ucb', float), ('Etotcb', float), \
-                 ('EgB', float), ('UB', float), ('EtotB', float), \
-                 ('EgHill', float), ('UHill', float), ('EtotHill', float), \
-                 ('L', float), ('vircb', float), ('virHill', float), \
-                 ('err', float)])
-    
+                 ('Egout', float), ('Uout', float), ('Etotout', float), \
+                 ('L', float), ('err', float)])
     
     
     
@@ -116,26 +119,28 @@ def mass_loss(filename, prms = prms, td = 3e6, tol = 1e-24, n = 100, nMpoints = 
     #dU/dr = 4 * pi * r**2 * P * Cv / R
     #"""
         
-        return np.array([ - G * x[2] * x[0] / (r**2 * prms.R * x[1]), \
-                             - Del(x[0], x[2], x[1], x[3], prms) * G * x[2] / \
-                             (prms.R * r**2),
-                             4 * pi * r**2 * x[0] / (prms.R * x[1]), \
-                             0, \
-                             - 4 * pi * G * x[2] * r * x[0] / (prms.R * x[1]), \
-                             4 * pi * r**2 * x[0] * prms.Cv / prms.R]) 
+        return np.array([ - G * prms.Mco * x[0] / (r**2 * prms.R * x[1]), \
+                            - Del(x[0], prms.Mco, x[1], x[2], prms) * G * prms.Mco / \
+                            (prms.R * r**2),
+                            #4 * pi * r**2 * x[0] / (prms.R * x[1]), \
+                            0, \
+                            - 4 * pi * G * prms.Mco * r * x[0] / (prms.R * x[1]), \
+                            4 * pi * r**2 * x[0] * prms.Cv / prms.R]) 
     #E0 = G * Mi**2 / rfit
-    R = np.logspace(np.log10(RBd*Re), np.log10(model.rco), nMpoints)
+    R = np.logspace(np.log10(RBd*Re), np.log10(0.9*RBd*Re), 2)
         #radius grid
-    r = R[:2]    
+    r = R#[:2]    
     
-    y = odeint(f, [prms.Pd, prms.Td, MBd*Me, Ld, EgBd, UBd], r)
+    y = odeint(f, [prms.Pd, prms.Td, Ld, 0, 0], r)
     
-    Mi = y[1][2]
-    Egabs = -(y[0][4] - y[1][4])
-    Etoti = y[1][4]
+    Ti = y[1][1]
+    Egabs = y[1][3]
 
-    
-    sol = shoot(Mi, Ld*1e-3, Ld*1e3, n, tol, prms)
+    prms2 = params(Mc, rc, a, delad, Y, gamma = gammafn(delad), R = Rfn(Y), \
+              Cv = Cvfn(Y, delad), Pd = Pdisk(a, mstar, FSigma, FT), \
+              Td = Ti, kappa = kdust)    
+            
+    sol = shoot(Ti, Ld*1e-3, Ld*1e3, n, tol, prms2)
     
     i = 0
     
@@ -163,11 +168,11 @@ def mass_loss(filename, prms = prms, td = 3e6, tol = 1e-24, n = 100, nMpoints = 
     
         r = R[i:i+2]    
     
-        y = odeint(f, [prms.Pd, prms.Td, Mi, Li, param2.EgB[i-1], param2.UB[i-1]], r)
+        y = odeint(f, [prms.Pd, prms.Td, Mi, Li, 0, 0], r)
     
         Mi = y[1][2]
         Li = param2.L[i - 1]
-        Egabs = Egabs -(y[0][4] - y[1][4])
+        Egabs = Egabs + y[1][4]
         Etoti = np.abs(param2.EtotB[i-1])
     
         sol = shoot(Mi, Li*1e-2, Li*1e2, n, tol, prms)

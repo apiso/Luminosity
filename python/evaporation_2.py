@@ -31,7 +31,7 @@ def delradfn(p, m, T, L, prms): #radiative temperature gradient
 def Del(p, m, T, L, prms): #del = min(delad, delrad)
     return min(prms.delad, delradfn(p, m, T, L, prms))
 
-def mass_loss(filename, prms = prms, td = 3e6, tol = 1e-24, n = 100, nMpoints = 500):
+def mass_loss(filename, prms, td = 3e6):
     
     """
     
@@ -75,6 +75,24 @@ def mass_loss(filename, prms = prms, td = 3e6, tol = 1e-24, n = 100, nMpoints = 
     EtotBd = float(fEtotB(MBd))
     
     
+    for i in range(len(param)):
+        if param.MB[i] <= MBd and param.MB[i + 1] > MBd:
+            break
+    ind = i
+    
+    for i in range(0, ind)[::-1]:
+        Eevap = np.abs(param.EtotB[ind] - param.EtotB[i])
+        Ecool = np.abs(param.EtotB[i])
+        if Ecool - Eevap <= 0:
+            break
+    indf = i
+            
+    len1 = len(param[:ind+1])
+    len2 = len(param[indf:ind][::-1])
+    nMpoints = len1 + len2
+    n = len(prof[0])
+        
+    
     model2 = np.array([(prms.Mco, prms.rco, prms.a, prms.delad, prms.Y, \
                           prms.gamma, prms.R, prms.Cv, prms.Pd, prms.Td, \
                           prms.kappa)], \
@@ -98,6 +116,20 @@ def mass_loss(filename, prms = prms, td = 3e6, tol = 1e-24, n = 100, nMpoints = 
                  ('EgHill', float), ('UHill', float), ('EtotHill', float), \
                  ('L', float), ('vircb', float), ('virHill', float), \
                  ('err', float)])
+                 
+    for i in range(len1):
+        param2[i] = param[i]
+        prof2[i] = prof[i]
+    for i in range(len2):
+        param2[len1 + i] = param[indf:ind][::-1][i]
+        prof2[len1 + i] = prof[indf:ind][::-1][i]
+        
+    dt2 = np.append(dt[:ind+1], dt[indf:ind][::-1])
+    time2 = []
+    for i in range(len(dt2)):
+        time2 = np.append(time2, sum(dt2[:i + 1]))
+    
+    return model2, param2, prof2, time2
     
     
     
