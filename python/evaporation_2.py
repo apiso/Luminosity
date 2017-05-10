@@ -211,7 +211,7 @@ def mass_loss_2(filename, prms, td = 3e6, n = 500, tol = 1e-24, SG = 1):
     
     
     
-def matching(filename, prms, td = 3e6, n = 500, tol = 1e-24, SG = 1):
+def matching(filename, prms, Pcguess, Tguess, L1, td = 3e6, n = 500, tol = 1e-24, SG = 1):
     
     L, t, Mf, rf, MBd, r, P, T, rho, m, delrad, Eg, U, Mcb, MB, rcb, RB, Pc, Pcb, Tc, Tcb, \
             Egcb, Ucb, Etotcb, EgB, UB, EtotB, Etot, Ecool, Eevap, indf =  mass_loss_2(filename, prms, td, n, tol, SG)
@@ -250,49 +250,134 @@ def matching(filename, prms, td = 3e6, n = 500, tol = 1e-24, SG = 1):
                              4 * pi * r**2 * x[0] * prms.Cv / prms.R]) 
     E0 = 0#G * prms.Mco**2 / prms.rco
     R = np.logspace(np.log10(prms.rco), np.log10(r[-2]), n)
+    #R = np.logspace(np.log10(prms.rco), np.log10(r[indf]), n)
     
-    y = odeint(f, [Pc, Tc, prms.Mco, L, -E0, E0], [prms.rco, r[-2]])
+    #y = odeint(f, [Pc, Tc, prms.Mco, L, -E0, E0], [prms.rco, r[-2]])
      
-    def deltaM(tcore):     
-           
-        y = odeint(f, [Pc, tcore, prms.Mco, L, -E0, E0], [prms.rco, r[-2]])                     
-        Mtot = y[:,2][1]
-        deltaM = 4 / np.pi * np.arctan(Mtot / m[-2]) - 1
-        #relative error; use of the arctan ensures deltaL stays between -1 and 1
-        if math.isnan(deltaM): #used to get rid of possible divergences
-                deltaM = 1.
-        return deltaM
-        
-        
-    def delta(x):  
+
+    def delta(lum):  
            
         #tcore = x[0]
         #Pcore = x[1]
         #lum = x[2]   
            
-        y1 = odeint(f, [x[1], x[0], prms.Mco, x[2], -E0, E0], [prms.rco, r[-2]])                     
+        y1 = odeint(f, [Pcguess, Tguess, prms.Mco, lum, -E0, E0], [prms.rco, R[-1]])  
+        #y1 = odeint(f, [Pcguess, Tguess, prms.Mco, lum, -E0, E0], [prms.rco, r[indf]])                        
+        
         Mtot = y1[:,2][1]
+        
         deltaM = 4 / np.pi * np.arctan(Mtot / m[-2]) - 1
+        #deltaM = 4 / np.pi * np.arctan(Mtot / m[indf]) - 1
         #relative error; use of the arctan ensures deltaL stays between -1 and 1
         if math.isnan(deltaM): #used to get rid of possible divergences
                 deltaM = 1.
-                
-        #deltaM = 4 / np.pi * np.arctan(Mtot / m[-2]) - 1
-        ##relative error; use of the arctan ensures deltaL stays between -1 and 1
-        #if math.isnan(deltaM): #used to get rid of possible divergences
-        #        deltaM = 1.
-        return deltaM
-
         
-        
-    tcoreguess = 0.9 * Tc
-    Pcoreguess = Pc/ 10   
-    Lguess = L*1e-1
+        return deltaM 
 
-    Tmatch = root(deltaM, 0.9*Tc)
-    #Tmatch = brentq(delta, T1, T2, xtol = tol)
+
+
+
+
+#        
+#        
+#    tcoreguess = 0.9 * Tc
+#    Pcoreguess = Pc/ 10   
+#    Lguess = L*1e-1
+#
+#    #Tmatch = root(delta, [tcoreguess, Pcoreguess, Lguess])
+    Lmatch = root(delta, L1, method = 'hybr')
+    y = odeint(f, [Pcguess, Tguess, prms.Mco, Lmatch.x, -E0, E0], R) 
+    #return Lmatch, y
+    
+    rnew = R
+    Pnew = y[:,0]
+    Tnew = y[:,1]
+    mnew = y[:,2]
+    Egnew = y[:,4]
+    Unew = y[:,5]
+    Lnew = Lmatch.x
+
+    delradnew = 0 * np.ndarray(shape = len(Pnew), dtype = float)
+    for i in range(len(delradnew)):
+        delradnew[i] = delradfn(Pnew[i], mnew[i], Tnew[i], Lnew, prms)
+
+    rhonew = Pnew / (prms.R * Tnew)
+
+    #interpolation functions to find the RCB
+    fr = interp1d(delradnew[::-1], rnew[::-1])
+    fP = interp1d(delradnew[::-1], Pnew[::-1])
+    fT = interp1d(delradnew[::-1], Tnew[::-1])
+    fm = interp1d(delradnew[::-1], mnew[::-1])
+    fEg = interp1d(delradnew[::-1], Egnew[::-1])
+    fU = interp1d(delradnew[::-1], Unew[::-1])
+
+    rcbnew = float(fr(prms.delad))
+    Pcbnew = float(fP(prms.delad))
+    Tcbnew = float(fT(prms.delad))
+    Mcbnew = float(fm(prms.delad))
+    Egcbnew = float(fEg(prms.delad))
+    Ucbnew = float(fU(prms.delad))
+    Etotcbnew = Egcb + Ucb
+    
+    return Lmatch, y, rcbnew
     
     
+    
+    
+    
+    
+    
+    #brentq(delta, L1, L2, xtol = tol)
+    
+    #def deltaM(tcore):     
+    #       
+    #    y = odeint(f, [Pc, tcore, prms.Mco, L, -E0, E0], [prms.rco, r[-2]])                     
+    #    Mtot = y[:,2][1]
+    #    Egtry = y[:,4][1]
+    #    Utry = y[:,5][1]
+    #    deltaM = 4 / np.pi * np.arctan(Mtot / m[-2]) - 1
+    #    deltaEg = 4 / np.pi * np.arctan(Egtry / Eg[-2]) - 1
+    #    deltaU = 4 / np.pi * np.arctan(Utry / U[-2]) - 1
+    #    #relative error; use of the arctan ensures deltaL stays between -1 and 1
+    #    if math.isnan(deltaM): #used to get rid of possible divergences
+    #            deltaM = 1.
+    #    elif math.isnan(deltaEg):
+    #        deltaEg = 1.
+    #    elif math.isnan(deltaU):
+    #        deltaU = 1.
+    #    
+    #    return np.array([deltaM, deltaEg, deltaU])
+    
+    
+    
+
+#
+#        
+#    def delta(x):  
+#           
+#        #tcore = x[0]
+#        #Pcore = x[1]
+#        #lum = x[2]   
+#           
+#        y1 = odeint(f, [x[1], x[0], prms.Mco, x[2], -E0, E0], [prms.rco, r[-2]])                     
+#        
+#        Mtot = y1[:,2][1]
+#        Egtry = y[:,4][1]
+#        Utry = y[:,5][1]
+#        
+#        deltaM = 4 / np.pi * np.arctan(Mtot / m[-2]) - 1
+#        #deltaEg = 4 / np.pi * np.arctan(Egtry / Eg[-2]) - 1
+#        #deltaU = 4 / np.pi * np.arctan(Utry / U[-2]) - 1
+#        #relative error; use of the arctan ensures deltaL stays between -1 and 1
+#        if math.isnan(deltaM): #used to get rid of possible divergences
+#                deltaM = 1.
+#        #elif math.isnan(deltaEg):
+#        #    deltaEg = 1.
+#        #elif math.isnan(deltaU):
+#        #    deltaU = 1.
+#        
+#        return deltaM #np.array([deltaM, deltaEg, deltaU])
+           
     
     
         #radius grid
