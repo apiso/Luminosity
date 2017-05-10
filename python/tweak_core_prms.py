@@ -152,13 +152,16 @@ Ptrial = np.logspace(np.log10(Pc*1e-3), np.log10(Pc*1e3), 50)
 Ttrial = np.linspace(Tc / 1.1, Tc * 1.1, 50)
 Ltrial = np.logspace(np.log10(L*1e-3), np.log10(L*1e3), 50)
 
-fp = open('../dat/SG/k_dust/grid_a1Mc10.txt', 'wb')
-fp.write("rcb      Mcb      Etotcb \n")
+fp = open('../dat/SG/k_dust/grid_a1Mc10_2.txt', 'wb')
+fp.write("i  j  k  rcb      Mcb      Etotcb \n")
 for i in range(50):
     for j in range(50):
         for k in range(50):
             try:
                 temp = trial(Ptrial[i], Ttrial[j], Ltrial[k])
+                fp.write(" %s " % str(i))
+                fp.write(" %s " % str(j))
+                fp.write(" %s " % str(k))
                 fp.write(" %.3f " % temp[0])
                 fp.write(" %.3f " % temp[1])
                 fp.write(" %.3f \n" % temp[2])
