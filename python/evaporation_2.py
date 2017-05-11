@@ -214,7 +214,7 @@ def mass_loss_2(filename, prms, td = 3e6, n = 500, tol = 1e-24, SG = 1):
 def matching(filename, prms, Pcguess, Tguess, L1, td = 3e6, n = 500, tol = 1e-24, SG = 1):
     
     L, t, Mf, rf, MBd, r, P, T, rho, m, delrad, Eg, U, Mcb, MB, rcb, RB, Pc, Pcb, Tc, Tcb, \
-            Egcb, Ucb, Etotcb, EgB, UB, EtotB, Etot, Ecool, Eevap, indf =  mass_loss_2(filename, prms, td, n, tol, SG)
+            Egcb, Ucb, Etotcb, EgB, UB, EtotB, Etot, Ecool, Eevap, indf =  evap2.mass_loss_2(filename, prms, td, n, tol, SG)
             
     sol = shoot(MBd * Me, L*1e-1, L*1e1, n, tol, prms)
     r, P, T, m, rho, delrad, Eg, U, Mi, Mcb, MB, rcb, \
@@ -222,7 +222,7 @@ def matching(filename, prms, Pcguess, Tguess, L1, td = 3e6, n = 500, tol = 1e-24
                 EgB, UB, EtotB, EgHill, UHill, EtotHill, L, vircb, virHill, err = sol     
     Etot = Eg + U
     
-    Evap = Etot[-1] - Etot[-2]
+    Eevap = Etot[-1] - Etot[-2]
     dt = - Eevap / L
     Ecool = Etot[-2]
     
@@ -264,9 +264,9 @@ def matching(filename, prms, Pcguess, Tguess, L1, td = 3e6, n = 500, tol = 1e-24
         y1 = odeint(f, [Pcguess, Tguess, prms.Mco, lum, -E0, E0], [prms.rco, R[-1]])  
         #y1 = odeint(f, [Pcguess, Tguess, prms.Mco, lum, -E0, E0], [prms.rco, r[indf]])                        
         
-        Mtot = y1[:,2][1]
+        T = y1[:,1][1]
         
-        deltaM = 4 / np.pi * np.arctan(Mtot / m[-2]) - 1
+        deltaT = 4 / np.pi * np.arctan(Mtot / m[-2]) - 1
         #deltaM = 4 / np.pi * np.arctan(Mtot / m[indf]) - 1
         #relative error; use of the arctan ensures deltaL stays between -1 and 1
         if math.isnan(deltaM): #used to get rid of possible divergences

@@ -203,22 +203,22 @@ def mass_loss_2(filename, prms, td = 3e6, n = 500, tol = 1e-24, SG = 1):
     indf = i
     
     rf = r[indf] / model.rco[0]
-    #if rf * model.rco[0] / Re >= rcb:
-    Mf = m[indf] / Me
-    t = -(EtotB - Etot[indf])/L
-    flag = 0
+    if rf * model.rco[0] / Re >= rcb:
+        Mf = m[indf] / Me
+        t = -(EtotB - Etot[indf])/L
+        flag = 0
     
-    #else:
-    #    for i in range(n)[::-1]:
-    #        if r[i] < rcb * Re:
-    #            break
-    #    indf = i
-    #    Eevap = np.abs(EtotB - Etot[indf])
-    #    Ecool = np.abs(Etot[indf])
-    #    Mf = m[indf] / Me
-    #    rf = r[indf] / model.rco[0]
-    #    t = -(EtotB - Etot[indf])/L
-    #    flag = 1
+    else:
+        for i in range(n)[::-1]:
+            if r[i] < rcb * Re:
+                break
+        indf = i
+        Eevap = np.abs(EtotB - Etot[indf])
+        Ecool = np.abs(Etot[indf])
+        Mf = m[indf] / Me
+        rf = r[indf] / model.rco[0]
+        t = -(EtotB - Etot[indf])/L
+        flag = 1
     
     
     return L, t, Mf, rf, MBd, r, P, T, rho, m, delrad, Eg, U, Mcb, MB, rcb, RB, Pc, Pcb, Tc, Tcb, \
@@ -230,7 +230,7 @@ def mass_loss_2(filename, prms, td = 3e6, n = 500, tol = 1e-24, SG = 1):
 def matching(filename, prms, td = 3e6, n = 500, tol = 1e-24, SG = 1):
     
     L, t, Mf, rf, MBd, r, P, T, rho, m, delrad, Eg, U, Mcb, MB, rcb, RB, Pc, Pcb, Tc, Tcb, \
-            Egcb, Ucb, Etotcb, EgB, UB, EtotB, Etot, Ecool, Eevap, indf, flag =  evap3.mass_loss_2(filename, prms, td, n, tol, SG)
+            Egcb, Ucb, Etotcb, EgB, UB, EtotB, Etot, Ecool, Eevap, indf, flag =  mass_loss_2(filename, prms, td, n, tol, SG)
             
     if flag == 0:
         print "Atmosphere evaporated before reaching rcb."

@@ -160,18 +160,31 @@ def profiles_write(n, nMpoints, L1, L2, Mmax, filename, Mmin = Mconv, prms = prm
     return model, param, prof
 
 
-def atmload(filename, prms = prms, disk = 1):
+def atmload(filename, prms, loss = 0):
 
-    if prms.kappa == kconst:
-        npzdat = numpy.load('../dat/SG/k_constant/' + filename + '.npz')
-    elif prms.kappa == kdust:
-        npzdat = numpy.load('../dat/SG/k_dust/' + filename + '.npz')
-    model = npzdat['model'].view(numpy.recarray)
-    param = npzdat['param'].view(numpy.recarray)
-    prof = npzdat['prof'].view(numpy.recarray)
-
+    #if prms.kappa == kconst:
+    #    npzdat = numpy.load('../dat/SG/k_constant/' + filename + '.npz')
+    #elif prms.kappa == kdust:
+    npzdat = numpy.load('../dat/SG/k_dust/' + filename + '.npz')
+    if loss == 0:
+        model = npzdat['model'].view(numpy.recarray)
+        param = npzdat['param'].view(numpy.recarray)
+        prof = npzdat['prof'].view(numpy.recarray)
+    else:
+        model = npzdat['model'].view(numpy.recarray)
+        param = npzdat['param'].view(numpy.recarray)
+        prof = npzdat['prof'].view(numpy.recarray)  
+        time = npzdat['time'].view(numpy.recarray)
+        Ecool = npzdat['Ecool'].view(numpy.recarray)
+        Eevap = npzdat['Eevap'].view(numpy.recarray)
+        i = npzdat['i'].view(numpy.recarray)    
+    
     npzdat.close()
+    
 
-    return model, param, prof
+    if loss == 0:
+        return model, param, prof
+    else:
+        return model, param, prof, time, Ecool, Eevap, i
 
 

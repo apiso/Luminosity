@@ -36,7 +36,7 @@ R_EOS = Rfn(Y)
 
 
 #core parameters
-Mc = 10*Me
+Mc = 2*Me
 rhoc = 2.0
 rc = (3*Mc/(4*np.pi*rhoc))**(1./3)
 

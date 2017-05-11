@@ -145,32 +145,50 @@ def trial(Ptry, Ttry, Ltry, filename = filename, prms = prms, td = td, n = n, to
     Ucbnew = float(fU(prms.delad))
     Etotcbnew = Egcbnew + Ucbnew
     
-    return rcbnew / Re, Mcbnew / Me, Etotcbnew
+    return rcbnew / Re, Mcbnew / Me, Etotcbnew, Tnew[-1]
     
     
 Ptrial = np.logspace(np.log10(Pc*1e-3), np.log10(Pc*1e3), 50)
 Ttrial = np.linspace(Tc / 1.1, Tc * 1.1, 50)
-Ltrial = np.logspace(np.log10(L*1e-3), np.log10(L*1e3), 50)
+Ltrial = L #np.logspace(np.log10(L*1e-3), np.log10(L*1e3), 50)
 
-fp = open('../dat/SG/k_dust/grid_a1Mc10_2.txt', 'wb')
-fp.write("i  j  k  rcb      Mcb      Etotcb \n")
-for i in range(50):
-    for j in range(50):
-        for k in range(50):
-            try:
-                temp = trial(Ptrial[i], Ttrial[j], Ltrial[k])
-                fp.write(" %s " % str(i))
-                fp.write(" %s " % str(j))
-                fp.write(" %s " % str(k))
-                fp.write(" %.3f " % temp[0])
-                fp.write(" %.3f " % temp[1])
-                fp.write(" %.3f \n" % temp[2])
-            except ValueError:
-                pass
-            
-            print i, j, k
-            
-fp.close()
+#fp = open('../dat/SG/k_dust/grid_a1Mc10_L_constant.txt', 'wb')
+#fp.write("i  j  rcb      Mcb      Etotcb \n")
+#for i in range(50):
+#    for j in range(50):
+#        try:
+#            temp = trial(Ptrial[i], Ttrial[j], Ltrial)
+#            fp.write(" %s " % str(i))
+#            fp.write(" %s " % str(j))
+#            fp.write(" %.3f " % temp[0])
+#            fp.write(" %.3f " % temp[1])
+#            fp.write(" %.3f \n" % temp[2])
+#        except ValueError:
+#            pass
+#            
+#        print i, j
+#            
+#fp.close()
+
+#fp = open('../dat/SG/k_dust/grid_a1Mc10_2.txt', 'wb')
+#fp.write("i  j  k  rcb      Mcb      Etotcb \n")
+#for i in range(50):
+#    for j in range(50):
+#        for k in range(50):
+#            try:
+#                temp = trial(Ptrial[i], Ttrial[j], Ltrial[k])
+#                fp.write(" %s " % str(i))
+#                fp.write(" %s " % str(j))
+#                fp.write(" %s " % str(k))
+#                fp.write(" %.3f " % temp[0])
+#                fp.write(" %.3f " % temp[1])
+#                fp.write(" %.3f \n" % temp[2])
+#            except ValueError:
+#                pass
+#            
+#            print i, j, k
+#            
+#fp.close()
 
 
 
