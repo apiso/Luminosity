@@ -116,6 +116,7 @@ def mass_loss(filename, prms, td = 3e6, tol = 1e-24, n = 500, nMpoints = 5000):
     #dL/dr = 0
     ###dEg/dr = - 4 * pi * G * m * r * P / (R * T)
     #dU/dr = 4 * pi * r**2 * P * Cv / R
+    #####dt/dr = 1 / (np.sqrt(R * T))
     #"""
         
         return np.array([ - G * x[2] * x[0] / (r**2 * prms.R * x[1]), \
@@ -124,7 +125,8 @@ def mass_loss(filename, prms, td = 3e6, tol = 1e-24, n = 500, nMpoints = 5000):
                              4 * pi * r**2 * x[0] / (prms.R * x[1]), \
                              0, \
                              - 4 * pi * G * x[2] * r * x[0] / (prms.R * x[1]), \
-                             4 * pi * r**2 * x[0] * prms.Cv / prms.R]) 
+                             4 * pi * r**2 * x[0] * prms.Cv / prms.R, \
+                             1 / (np.sqrt(prms.R * x[1]))]) 
     #E0 = G * Mi**2 / rfit
     R = np.logspace(np.log10(RBd*Re), np.log10(model.rco), n)
         #radius grid
@@ -178,25 +180,49 @@ def mass_loss(filename, prms, td = 3e6, tol = 1e-24, n = 500, nMpoints = 5000):
         #tcore = x[1]
         #lum = x[2]   
            
-            ynew = odeint(f, [x[0], x[1], model.Mco, L, 0, 0], [rnew[0], rnew[-1]])  
+            ynew = odeint(f, [x[0], x[1], model.Mco, x[2], 0, 0, 0], rnew)  
+            #ynew2 = odeint(f, [x[0], x[1], model.Mco, x[2], 0, 0], [rnew[-2], rnew[-1]]) 
         #y1 = odeint(f, [Pcguess, Tguess, prms.Mco, lum, -E0, E0], [prms.rco, r[indf]])                        
         
             Temp = ynew[:,1][-1]
             Mass = ynew[:,2][-1]
+            Massnext = ynew[:,2][-2]
+            Pressure = ynew[:,0][-1]
+            density = Pressure / (model.R * Temp)
+            lum = ynew[:,3][-1]
+            
+            Ecool = ynew[:,4][-1] + ynew[:,5][-1]
+            Eevap_diff = param2.EtotB[i] - Ecool
+            
+        #
+        #    def f2(y, r):
+        #
+        #        return np.array([ - G * y[2] * y[0] / (r**2 * prms.R * y[1]), \
+        #                     - Del(y[0], y[2], y[1], y[3], prms) * G * y[2] / \
+        #                     (prms.R * r**2),
+        #                     4 * pi * r**2 * y[0] / (prms.R * y[1]), \
+        #                     0, \
+        #                        ]) 
+        #    
+            
+            dt = (param2.MB[i]*Me - Mass) / (4 * np.pi * density * rfit**2 * \
+                np.sqrt(model.R * model.Td))
+             
                 
             deltaT = 4 / np.pi * np.arctan(Mass/ mass[-2]) - 1
             deltaM = 4 / np.pi * np.arctan(Temp/ model.Td[0]) - 1
+            deltaL = 4 / np.pi * np.arctan(lum/ (- Eevap_diff / dt)) - 1
         
         #deltaM = 4 / np.pi * np.arctan(Mtot / m[indf]) - 1
         #relative error; use of the arctan ensures deltaL stays between -1 and 1
         #if math.isnan(deltaM): #used to get rid of possible divergences
         #        deltaM = 1.
         
-            err = (deltaT, deltaM)
+            err = (deltaT, deltaM, deltaL)
             return err
     
-        Pctry, Tctry = param2.Pc[i], param2.Tc[i]
-        x0 = (Pctry, Tctry)  
+        Pctry, Tctry, Ltry = param2.Pc[i], param2.Tc[i], param2.L[i]
+        x0 = (Pctry, Tctry, Ltry)  
         match = root(delta, x0)
         if match.success == False:
             flag = 1
@@ -207,8 +233,9 @@ def mass_loss(filename, prms, td = 3e6, tol = 1e-24, n = 500, nMpoints = 5000):
     
         ynew = odeint(f, [Pcmatch, Tcmatch, model.Mco, L, 0, 0], rnew)
         Ecool = ynew[:,4][-1] + ynew[:,5][-1]
+        Eevap_diff = param2.EtotB[i] - Ecool
         Eevap = param2.EtotB[0] - Ecool
-        dt = - Eevap / L
+        dt = - Eevap_diff / L
         time = np.append(time,  dt)
     
 
@@ -268,7 +295,7 @@ def mass_loss(filename, prms, td = 3e6, tol = 1e-24, n = 500, nMpoints = 5000):
         else: #if RB > RHill, we are outside our boundaries, so set all Bondi
             #values to the Hill values 
             MBnew, RBnew, PBnew, TBnew, EgBnew, UBnew, EtotBnew = \
-                mnew[-1], rnew[-1], Pnew[-1], Tnew[-1], EgHillnew, UHillnew, EtotHillnew
+                mnew[-1], rfit, prms.Pd, prms.Td, EgHillnew, UHillnew, EtotHillnew
                 
         sol = rnew, Pnew, Tnew, mnew, rhonew, delradnew, Egnew, Unew, mnew[-1] / Me, \
             Mcbnew / Me, MBnew / Me, rcbnew / Re, RBnew / Re, rfit / Re, \
