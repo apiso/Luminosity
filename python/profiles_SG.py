@@ -177,7 +177,8 @@ def atmload(filename, prms, loss = 0):
         time = npzdat['time'].view(numpy.recarray)
         Ecool = npzdat['Ecool'].view(numpy.recarray)
         Eevap = npzdat['Eevap'].view(numpy.recarray)
-        i = npzdat['i'].view(numpy.recarray)    
+        i = npzdat['i'].view(numpy.recarray)   
+        time2 = npzdat['time2'].view(numpy.recarray) 
     
     npzdat.close()
     
@@ -185,6 +186,6 @@ def atmload(filename, prms, loss = 0):
     if loss == 0:
         return model, param, prof
     else:
-        return model, param, prof, time, Ecool, Eevap, i
+        return model, param, prof, time, Ecool, Eevap, i, time2
 
 
