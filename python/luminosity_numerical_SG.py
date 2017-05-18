@@ -48,7 +48,7 @@ def delradfn(p, m, T, L, prms = prms): #radiative temperature gradient
 def Del(p, m, T, L, prms = prms): #del = min(delad, delrad)
     return min(prms.delad, delradfn(p, m, T, L, prms))
 
-def Ltop(Mi, L1, L2, n, tol, prms = prms):
+def Ltop(Mi, L1, L2, n, tol, prms):
 
     """
     Iterates among luminosity values until a converged atmosphere solution is
@@ -131,7 +131,7 @@ def Ltop(Mi, L1, L2, n, tol, prms = prms):
   
 ###-----------------------------------------------------------------------------
 
-def shoot(Mi, L1, L2, n, tol, prms = prms):
+def shoot(Mi, L1, L2, n, tol, prms):
 
     """
     Returns the converged atmospheric profile, first by calling iteration

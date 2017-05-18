@@ -14,7 +14,7 @@ from scipy import integrate, interpolate, optimize
 from scipy.integrate import odeint
 from types import FunctionType as function
 from scipy.interpolate import interp1d
-from scipy.optimize import brentq, root
+from scipy.optimize import brentq, root, fsolve
 from profiles_SG import atmload
 from cooling import cooling_global
 from luminosity_numerical_SG import shoot
@@ -157,12 +157,14 @@ def mass_loss(filename, prms, td = 3e6, tol = 1e-24, n = 500, nMpoints = 5000):
     i = 0
     Eevap = 0
     Ecool = param2.EtotB[0]
-    time = []
-    time2 = []
+    dt2 = 0
+    time = [1e-3]
+    time2 = [0]
     flag = 0
     #mass = np.linspace(model.Mco, MBd * Me, n)
     
-    while(np.abs(Ecool) - np.abs(Eevap)) >= 0 and flag == 0:
+    while (time2[-1] <= time[-1]) or time[-1] < 0:
+    #while(np.abs(Ecool) - np.abs(Eevap)) >= 0 and flag == 0:
         
         mass = np.linspace(model.Mco, param2.MB[i] * Me, n)
         RBondi = c.RB(mass[-2], model.a)
@@ -196,7 +198,7 @@ def mass_loss(filename, prms, td = 3e6, tol = 1e-24, n = 500, nMpoints = 5000):
                 
             deltaT = 4 / np.pi * np.arctan(Mass[-1] / mass[-2]) - 1
             deltaM = 4 / np.pi * np.arctan(Temp[-1] / model.Td[0]) - 1
-            deltaL = 0 #4 / np.pi * np.arctan(Tcbnew / (param2.Tcb[i] * 1.001)) - 1
+            deltaL = 4 / np.pi * np.arctan(Tcbnew / (1.5275 * model.Td[0])) - 1
         
         #deltaM = 4 / np.pi * np.arctan(Mtot / m[indf]) - 1
         #relative error; use of the arctan ensures deltaL stays between -1 and 1
@@ -209,12 +211,20 @@ def mass_loss(filename, prms, td = 3e6, tol = 1e-24, n = 500, nMpoints = 5000):
         Pctry, Tctry, Ltry = param2.Pc[i], param2.Tc[i], param2.L[i]
         x0 = (Pctry, Tctry, Ltry)  
         match = root(delta, x0)
-        if match.success == False:
-            flag = 1
+        it = 0
+        while (match.success) == False:
+            Pctry, Tctry, Lctry = Pctry / 1.0001, Tctry / 1.0001, Ltry / 1.0001
+            x0 = (Pctry, Tctry, Ltry)  
+            match = root(delta, x0)
+            it += 1
+            if it == 100:
+                break
+        #if match.success == False:
+        #    flag = 1
             #print "Nope! Try different initial guesses."
             #sys.exit()
-        else:  
-            Pcmatch, Tcmatch, Lmatch =  match.x
+        #else:  
+        Pcmatch, Tcmatch, Lmatch =  match.x
     
         ynew = odeint(f, [Pcmatch, Tcmatch, model.Mco, Lmatch, 0, 0], rnew)
         Ecool = ynew[:,4][-1] + ynew[:,5][-1]
@@ -237,7 +247,7 @@ def mass_loss(filename, prms, td = 3e6, tol = 1e-24, n = 500, nMpoints = 5000):
 
         rhonew = Pnew / (prms.R * Tnew)
         
-        dt2 = (param2.MB[i]*Me - mnew[-1]) / (4 * np.pi * rhonew[-1] * rfit**2 * \
+        dt2 = dt2 + (param2.MB[i]*Me - mnew[-1]) / (4 * np.pi * rhonew[-1] * rfit**2 * \
                 np.sqrt(model.R * model.Td))
         time2 = np.append(time2, dt2)
 
