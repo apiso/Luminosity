@@ -82,7 +82,7 @@ def atmseries(a, rhoc, delad, Y, Mcomin, Mcomax, nMco, n = 500, \
         Mconv = mass_conv(prms.Mco, prms.Mco*1.3, 500, 1e-24, prms.Mco, prms)[0] * Me * 1.001
         Mmin = Mconv
 
-        profiles_write(n, nMpoints, L1, L2, Mmax, 'a10Mc' + \
+        profiles_write(n, nMpoints, L1, L2, Mmax, 'a01Mc' + \
                     str(int(Mcore[i]/Me)), Mmin, prms)
           
 

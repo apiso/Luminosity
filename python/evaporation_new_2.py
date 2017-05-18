@@ -318,7 +318,7 @@ def mass_loss(filename, prms, td = 3e6, tol = 1e-24, n = 500, nMpoints = 5000):
                       sol[5][k], sol[6][k], sol[7][k]  
         print i
     
-    paramfilename = '../dat/SG/k_dust/' + filename + '_loss_test.npz'
+    paramfilename = '../dat/SG/k_dust/' + filename + '_loss.npz'
     np.savez_compressed(paramfilename, model = model, param = param2, prof = prof2, \
         time = time, Ecool = Ecool, Eevap = Eevap, i = i, time2 = time2)                  
         

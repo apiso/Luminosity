@@ -64,7 +64,7 @@ def Hdisk(a, FT):  #a in AU
 
 def kdust(T, rho = None, b = 2, fsolar = 1.):
     """Opacity (generally applicable for beta = 2)"""
-    return 2 * fsolar * (T/100.)**b
+    return 2 * fsolar * (T/100.)**b / 2e3
     
 def kconst(T, rho):
     return 0.1 #constant opacity cf. Ginzburg+16

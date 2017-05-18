@@ -311,6 +311,34 @@ def mass_loss(filename, prms, td = 3e6, tol = 1e-24, n = 500, nMpoints = 5000):
         
     return prof2, param2, time, Ecool, Eevap, i, flag, time2
     
+
+
+def time_comp(filename, prms):
+    
+    model, param, prof, time, Ecool, Eevap, i, time2 = atmload(filename, prms, loss = 1)
+    deltat = time - time2
+    
+    for j in range(len(deltat) - 1):
+        if deltat[j] > 0 and deltat[j + 1] < 0 and deltat[j + 2] < 0:
+            break
+    #try:        
+    frcb = interp1d([deltat[j], deltat[j + 1]], param.rcb[1:i+1][j:j+2])
+    rcbf = float(frcb(0))
+
+    ft = interp1d([deltat[j], deltat[j + 1]], time[j:j+2])
+    tf = float(ft(0))
+    
+    fM = interp1d(param.rcb[:i+1], param.MB[:i+1])
+    Mf = float(fM(rcbf))
+    
+    #except ValueError:
+    #    rcbf = param.rcb[i]
+    #    tf = time[-1]
+    #    Mf = param.MB[i]
+    
+    return rcbf, tf, Mf
+
+    
 #def mass_loss_tweak_n(filename, prms, td = 3e6, tol = 1e-24, ni = 10, nf = 200, nMpoints = 5000):
 #    
 #    #prof1, param1, time1, Ecool1, Eevap1, i1, flag = mass_loss(filename, prms, td, tol, ni, nMpoints)
