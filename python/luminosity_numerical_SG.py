@@ -33,6 +33,7 @@ from scipy import integrate, interpolate, optimize
 from scipy.integrate import odeint
 from scipy.interpolate import interp1d
 from scipy.optimize import brentq
+from utils import constants as c
 
 #-----------------------------------------------------------------------------
 
@@ -113,7 +114,7 @@ def Ltop(Mi, L1, L2, n, tol, prms):
         """
 
         #integration of the structure equations
-        y = odeint(f, [prms.Pd, prms.Td, Mi, lum], [RHill(Mi, prms.a), prms.rco])
+        y = odeint(f, [prms.Pd, prms.Td, Mi, lum], [min(RHill(Mi, prms.a), c.RB(Mi, prms.a)), prms.rco])
             
         Mc1 = y[:,2][-1] #core mass from the guessed L
 
@@ -185,7 +186,7 @@ def shoot(Mi, L1, L2, n, tol, prms):
     
     """
 
-    rfit = RHill(Mi, prms.a) #sets the outer boundary conditions at the Hill radius
+    rfit = min(RHill(Mi, prms.a), c.RB(Mi, prms.a)) #sets the outer boundary conditions at the Hill radius
     Lpluserror = Ltop(Mi, L1, L2, n, tol, prms)
     L = Lpluserror[0]
     err = Lpluserror[1]
