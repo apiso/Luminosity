@@ -17,7 +17,7 @@ from constants import Me, Rb, Rfn
 
 
 #disk parameters (relative to MMSN model)
-a = 1 #disk radius in AU
+a = 10 #disk radius in AU
 FT = 1.0
 FSigma = 1.0
 mstar = 1.0 #star mass in solar masses

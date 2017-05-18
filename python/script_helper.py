@@ -5,7 +5,7 @@ prms=psg.prms
 
 reload(evap)
 
-filename='a10Mc1'
+filename='a10Mc10'
 test=evap.mass_loss(filename, prms, n=100)
 
 prof2, param2, time, Ecool, Eevap, i, flag, time2=test
