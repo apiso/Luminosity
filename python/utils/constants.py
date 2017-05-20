@@ -44,10 +44,10 @@ def RHill(mp, a, Ms = Msun):
 #(could/ should make the deviations from standard MMSN optional or keyword parameters)
 def Tdisk(a, FT):  
     """Disk temperature as function of semi-major axis (a in AU) and Ft"""
-    if a >= 0.5:
-        return 120 * FT * (a)**(-3./7)
-    else:
-        return 1e3
+    #if a >= 0.5:
+    return 120 * FT * (a)**(-3./7)
+    #else:
+    #    return 1e3
 
 def Pdisk(a, mstar, FSigma, FT): 
     """
