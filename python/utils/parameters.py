@@ -17,7 +17,7 @@ from constants import Me, Rb, Rfn
 
 
 #disk parameters (relative to MMSN model)
-a = 0.1 #disk radius in AU
+a = 1 #disk radius in AU
 FT = 1.0
 FSigma = 1.0
 mstar = 1.0 #star mass in solar masses
@@ -36,7 +36,7 @@ R_EOS = Rfn(Y)
 
 
 #core parameters
-Mc = 2*Me
+Mc = 10*Me
 rhoc = 2.0
 rc = (3*Mc/(4*np.pi*rhoc))**(1./3)
 
