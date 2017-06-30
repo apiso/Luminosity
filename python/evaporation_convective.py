@@ -17,14 +17,65 @@ from scipy.interpolate import interp1d
 from scipy.optimize import brentq, root, fsolve
 from profiles_SG import atmload
 from cooling import cooling_global
-from luminosity_numerical_SG import shoot
+from luminosity_numerical_SG import shoot, mass_conv
 from utils import constants as c
 
 
 #prms = params(Mc, rc, a, delad, Y, gamma = gammafn(delad), R = Rfn(Y), \
 #              Cv = Cvfn(Y, delad), Pd = Pdisk(a, mstar, FSigma, FT), \
 #              Td = Tdisk(a, FT), kappa = kdust) #gas, disk and core parameters
-                        #for specific values imported from parameters.py 
+                            #for specific values imported from parameters.py 
+                            
+                            
+    
+#def mass_conv(M1, M2, n, tol, Mc, prms):
+#
+#    """
+#    Finds the mass of the fully convective solution (i.e. minimum atmosphere mass)
+#    
+#    """
+#
+#    #rc = (3 * Mc / (4 * numpy.pi * rhoc))**(1./3)
+#
+#    #prms = paramsEOS(Mc, rc, Y, a, Pd = Pdisk(a, mstar, FSigma, FT), \
+#    #             Td = Tdisk(a, FT), kappa = kdust)
+#
+#    def f(x, r):
+#        """
+#        structure eqns. "x" = [p , T , m, L]
+#        dp/dr = - G * m * rho / (r**2),
+#        dT/dr = - del *  T * rho * G * m / (P * r**2)
+#        dm/dr = 4 * pi * r**2 * rho
+#        """
+#        return numpy.array([ - G * x[2] * x[0] / (r**2 * prms.R * x[1]), \
+#                            - prms.delad * G * x[2] / \
+#                                (prms.R * r**2),
+#                            4 * pi * r**2 * x[0] / (prms.R * x[1])])  
+#        
+#          
+#
+#    def delta(mass):
+#        
+#        """
+#        Returns the relative error between the core mass obtained by integrating
+#        from a luminosity lum and the actual core mass.
+#
+#        """
+#        rfit = RHill(mass, prms.a)
+#        r = numpy.logspace(numpy.log10(rfit), numpy.log10(prms.rco), n)
+#        #integration of the structure equations
+#        y = odeint(f, [prms.Pd, prms.Td, mass], r)
+#            
+#        Mc1 = y[:,2][-1] #core mass from the guessed L
+#
+#        deltam = 4 / numpy.pi * numpy.arctan(Mc1 / prms.Mco) - 1
+#	
+#        return deltam
+#    
+#    Mmatch = brentq(delta, M1, M2, xtol = tol, maxiter = 500)
+#
+#    return Mmatch/Me, delta(Mmatch)
+
 
 def delradfn(p, m, T, L, prms): #radiative temperature gradient
     rho = p / (prms.R * T)
@@ -32,6 +83,7 @@ def delradfn(p, m, T, L, prms): #radiative temperature gradient
 
 def Del(p, m, T, L, prms): #del = min(delad, delrad)
     return min(prms.delad, delradfn(p, m, T, L, prms))
+
 
 def mass_loss(filename, prms, td = 3e6, tol = 1e-24, n = 500, nMpoints = 5000):
     
@@ -43,38 +95,24 @@ def mass_loss(filename, prms, td = 3e6, tol = 1e-24, n = 500, nMpoints = 5000):
     atmospheric luminosity, radius, pressure etc.
     
     """
-    
-    model, param, prof = atmload(filename, prms)
-    dt = cooling_global(param, prof, model, out='rcb')[1]
-    
-    time = []
-    
-    for i in range(len(dt)):
-        time = np.append(time, sum(dt[:i + 1]))
-        
-    f = interp1d(time / yr, param.MB[:-1])
-    MBd = float(f(td))
-    
-    fMrcb = interp1d(param.MB, param.Mcb)
-    Mrcbd = float(fMrcb(MBd))
-    
-    frcb = interp1d(param.MB, param.rcb)
-    rcbd = float(frcb(MBd))
+    Mconv = mass_conv(prms.Mco, prms.Mco*1.3, 5000, 1e-24, prms.Mco, prms)[0] * Me #* 1.0001  
+    MBd = Mconv
 
-    fRB = interp1d(param.MB, param.RB)
-    RBd = float(fRB(MBd))
+    model, param, prof = atmload(filename, prms)
+    RBondi = c.RB(Mconv, model.a)
+    Rout = c.RHill(Mconv, model.a)
+    RBd = min(RBondi, Rout)  
     
-    fL = interp1d(param.MB, param.L)
-    Ld = float(fL(MBd))
+    #dt = cooling_global(param, prof, model, out='rcb')[1]
     
-    fEgB = interp1d(param.MB, param.EgB)
-    EgBd = float(fEgB(MBd))
+    #time = []
     
-    fUB = interp1d(param.MB, param.UB)
-    UBd = float(fUB(MBd))
-    
-    fEtotB = interp1d(param.MB, param.EtotB)
-    EtotBd = float(fEtotB(MBd))
+    #for i in range(len(dt)):
+    #    time = np.append(time, sum(dt[:i + 1]))
+        
+    #MBd = param.MB[0]
+    #RBd = param.RB[0]
+    #Ld = param.L[0]
     
     
     model2 = np.array([(prms.Mco, prms.rco, prms.a, prms.delad, prms.Y, \
@@ -106,33 +144,25 @@ def mass_loss(filename, prms, td = 3e6, tol = 1e-24, n = 500, nMpoints = 5000):
     
     
     def f(x, r):
-    #    
-    #"""
-    #structure eqns. "x" = [p , T , m, L, Eg, U, Iu],
-    #    with Iu the 3p/rho dm integral in the virial theorem
-    #dp/dr = - G * m * P / (r**2 * R * T),
-    #dT/dr = - del * G * m / (R * r**2)
-    ###dm/dr = 4 * pi * r**2 * p / (R * T)
-    #dL/dr = 0
-    ###dEg/dr = - 4 * pi * G * m * r * P / (R * T)
-    #dU/dr = 4 * pi * r**2 * P * Cv / R
-    #"""
-        
+        """
+        structure eqns. "x" = [p , T , m]
+        dp/dr = - G * m * rho / (r**2),
+        dT/dr = - del *  T * rho * G * m / (P * r**2)
+        dm/dr = 4 * pi * r**2 * rho
+        """
         return np.array([ - G * x[2] * x[0] / (r**2 * prms.R * x[1]), \
-                             - Del(x[0], x[2], x[1], x[3], prms) * G * x[2] / \
-                             (prms.R * r**2),
-                             4 * pi * r**2 * x[0] / (prms.R * x[1]), \
-                             0, \
-                             - 4 * pi * G * x[2] * r * x[0] / (prms.R * x[1]), \
-                             4 * pi * r**2 * x[0] * prms.Cv / prms.R]) 
-    #E0 = G * Mi**2 / rfit
+                            - prms.delad * G * x[2] / \
+                                (prms.R * r**2),
+                            4 * pi * r**2 * x[0] / (prms.R * x[1]), \
+                            - 4 * pi * G * x[2] * r * x[0] / (prms.R * x[1]), \
+                             4 * pi * r**2 * x[0] * prms.Cv / prms.R])  
     R = np.logspace(np.log10(RBd*Re), np.log10(model.rco), n)
         #radius grid
     r = R#[:2]    
     
     #y = odeint(f, [prms.Pd, prms.Td, MBd*Me, Ld, EgBd, UBd], r)
     
-    sol = shoot(MBd * Me, 1e20, 1e30, n, tol, prms)
+    sol = shoot(MBd, 1e20, 1e30, n, tol, prms)
     
     i = 0
     
@@ -173,7 +203,7 @@ def mass_loss(filename, prms, td = 3e6, tol = 1e-24, n = 500, nMpoints = 5000):
         rnew = np.logspace(np.log10(model.rco), np.log10(rfit), n)
         
     
-        Pc, Tc, L = param2.Pc[i], param2.Tc[i], param2.L[i]
+        Pc, Tc = param2.Pc[i], param2.Tc[i]
         
         def delta(x):  
         
@@ -181,40 +211,40 @@ def mass_loss(filename, prms, td = 3e6, tol = 1e-24, n = 500, nMpoints = 5000):
         #tcore = x[1]
         #lum = x[2]   
            
-            ynew = odeint(f, [x[0], x[1], model.Mco, x[2], 0, 0], rnew)  
+            ynew = odeint(f, [x[0], x[1], model.Mco, 0, 0], rnew)  
         #y1 = odeint(f, [Pcguess, Tguess, prms.Mco, lum, -E0, E0], [prms.rco, r[indf]])                        
         
             Pressure = ynew[:,0]
             Temp = ynew[:,1]
             Mass = ynew[:,2]
-            lum = ynew[:,3]
+            #lum = ynew[:,3]
         
-            delradnew = 0 * np.ndarray(shape = len(rnew), dtype = float)
-            for j in range(len(delradnew)):
-                delradnew[j] = delradfn(Pressure[j], Mass[j], Temp[j], lum[j], prms)
+            #delradnew = 0 * np.ndarray(shape = len(rnew), dtype = float)
+            #for j in range(len(delradnew)):
+            #    delradnew[j] = delradfn(Pressure[j], Mass[j], Temp[j], lum[j], prms)
                 
-            fT = interp1d(delradnew[::-1], Temp[::-1])
-            Tcbnew = float(fT(prms.delad))
+            #fT = interp1d(delradnew[::-1], Temp[::-1])
+            #Tcbnew = float(fT(prms.delad))
                 
             deltaT = 4 / np.pi * np.arctan(Mass[-1] / mass[-2]) - 1
             deltaM = 4 / np.pi * np.arctan(Temp[-1] / model.Td[0]) - 1
-            deltaL = 4 / np.pi * np.arctan(Tcbnew / (1.5275 * model.Td[0])) - 1
+            #deltaL = 4 / np.pi * np.arctan(Tcbnew / (1.5275 * model.Td[0])) - 1
         
         #deltaM = 4 / np.pi * np.arctan(Mtot / m[indf]) - 1
         #relative error; use of the arctan ensures deltaL stays between -1 and 1
         #if math.isnan(deltaM): #used to get rid of possible divergences
         #        deltaM = 1.
         
-            err = (deltaT, deltaM, deltaL)
+            err = (deltaT, deltaM)
             return err
     
-        Pctry, Tctry, Ltry = param2.Pc[i]/1.001, param2.Tc[i]/1.001, param2.L[i]*1.01
-        x0 = (Pctry, Tctry, Ltry)  
+        Pctry, Tctry = param2.Pc[i]/1.0001, param2.Tc[i]/1.0001
+        x0 = (Pctry, Tctry)  
         match = root(delta, x0)
         it = 0
         while (match.success) == False:
-            Pctry, Tctry, Ltry = Pctry / 1.0001, Tctry / 1.0001, Ltry / 1.0001
-            x0 = (Pctry, Tctry, Ltry)  
+            Pctry, Tctry = Pctry / 1.0001, Tctry / 1.0001
+            x0 = (Pctry, Tctry)  
             match = root(delta, x0)
             #it += 1
             #if it == 100:
@@ -224,26 +254,25 @@ def mass_loss(filename, prms, td = 3e6, tol = 1e-24, n = 500, nMpoints = 5000):
             #print "Nope! Try different initial guesses."
             #sys.exit()
         #else:  
-        Pcmatch, Tcmatch, Lmatch =  match.x
+        Pcmatch, Tcmatch =  match.x
     
-        ynew = odeint(f, [Pcmatch, Tcmatch, model.Mco, Lmatch, 0, 0], rnew)
-        Ecool = ynew[:,4][-1] + ynew[:,5][-1]
+        ynew = odeint(f, [Pcmatch, Tcmatch, model.Mco, 0, 0], rnew)
+        Ecool = ynew[:,3][-1] + ynew[:,4][-1]
         Eevap = param2.EtotB[0] - Ecool
-        dt = - Eevap / Lmatch
-        time = np.append(time,  dt)
+
 
         Pnew = ynew[:,0]
         Tnew = ynew[:,1]
         mnew = ynew[:,2]
-        Egnew = ynew[:,4]
-        Unew = ynew[:,5]
+        Egnew = ynew[:,3]
+        Unew = ynew[:,4]
         
              
 
 
         delradnew = 0 * np.ndarray(shape = len(Pnew), dtype = float)
         for j in range(len(delradnew)):
-            delradnew[j] = delradfn(Pnew[j], mnew[j], Tnew[j], Lmatch, prms)
+            delradnew[j] = prms.delad #delradfn(Pnew[j], mnew[j], Tnew[j], Lmatch, prms)
 
         rhonew = Pnew / (prms.R * Tnew)
         
@@ -252,20 +281,20 @@ def mass_loss(filename, prms, td = 3e6, tol = 1e-24, n = 500, nMpoints = 5000):
         time2 = np.append(time2, dt2)
 
     #interpolation functions to find the RCB
-        fr = interp1d(delradnew[::-1], rnew[::-1])
-        fP = interp1d(delradnew[::-1], Pnew[::-1])
-        fT = interp1d(delradnew[::-1], Tnew[::-1])
-        fm = interp1d(delradnew[::-1], mnew[::-1])
-        fEg = interp1d(delradnew[::-1], Egnew[::-1])
-        fU = interp1d(delradnew[::-1], Unew[::-1])
+        #fr = interp1d(delradnew[::-1], rnew[::-1])
+        #fP = interp1d(delradnew[::-1], Pnew[::-1])
+        #fT = interp1d(delradnew[::-1], Tnew[::-1])
+        #fm = interp1d(delradnew[::-1], mnew[::-1])
+        #fEg = interp1d(delradnew[::-1], Egnew[::-1])
+        #fU = interp1d(delradnew[::-1], Unew[::-1])
 
-        rcbnew = float(fr(prms.delad))
-        Pcbnew = float(fP(prms.delad))
-        Tcbnew = float(fT(prms.delad))
-        Mcbnew = float(fm(prms.delad))
-        Egcbnew = float(fEg(prms.delad))
-        Ucbnew = float(fU(prms.delad))
-        Etotcbnew = Egcbnew + Ucbnew
+        #rcbnew = float(fr(prms.delad))
+        #Pcbnew = float(fP(prms.delad))
+        #Tcbnew = float(fT(prms.delad))
+        #Mcbnew = float(fm(prms.delad))
+        #Egcbnew = float(fEg(prms.delad))
+        #Ucbnew = float(fU(prms.delad))
+        #Etotcbnew = Egcbnew + Ucbnew
 
         EgHillnew = Egnew[-1]
         UHillnew = Unew[-1]
@@ -296,10 +325,17 @@ def mass_loss(filename, prms, td = 3e6, tol = 1e-24, n = 500, nMpoints = 5000):
             MBnew, RBnew, PBnew, TBnew, EgBnew, UBnew, EtotBnew = \
                 mnew[-1], rnew[-1], Pnew[-1], Tnew[-1], EgHillnew, UHillnew, EtotHillnew
                 
+        rhoBnew = PBnew / (prms.R * TBnew)        
+        Lnew = 64 * np.pi / 3 * sigma * TBnew**4 * prms.delad * RBnew \
+            / (prms.kappa(TBnew) * rhoBnew)
+        
+        dt = - Eevap / Lnew
+        time = np.append(time,  dt)
+                
         sol = rnew, Pnew, Tnew, mnew, rhonew, delradnew, Egnew, Unew, mnew[-1] / Me, \
-            Mcbnew / Me, MBnew / Me, rcbnew / Re, RBnew / Re, rfit / Re, \
-                Pcnew, Pcbnew, PBnew, Tcnew, Tcbnew, TBnew, Egcbnew, Ucbnew, Etotcbnew, \
-                    EgBnew, UBnew, EtotBnew, EgHillnew, UHillnew, EtotHillnew, Lmatch, 0, 0, 0
+            MBnew / Me, MBnew / Me, RBnew / Re, RBnew / Re, rfit / Re, \
+                Pcnew, PBnew, PBnew, Tcnew, TBnew, TBnew, EgBnew, UBnew, EtotBnew, \
+                    EgBnew, UBnew, EtotBnew, EgHillnew, UHillnew, EtotHillnew, Lnew, 0, 0, 0
         i += 1   
         
         param2.Mtot[i], param2.Mcb[i], param2.MB[i], param2.rcb[i], param2.RB[i], \
